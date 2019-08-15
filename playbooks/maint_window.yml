@@ -1,0 +1,13 @@
+---
+- name: create maintenance windows
+  hosts:
+#  - server1.example.com
+#  gather_facts: yes
+
+  gather_facts: yes
+
+  vars:
+    cl_message: "{{ 'Enabled' if mw_enable == 'True' else 'Disabled' }} Ansible role maint_window"
+
+  roles:
+  - role: maint_window

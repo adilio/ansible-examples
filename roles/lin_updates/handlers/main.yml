@@ -1,0 +1,5 @@
+---
+- name: Reboot Servers - Use the reboot handler!
+  command: /sbin/shutdown -r now
+
+

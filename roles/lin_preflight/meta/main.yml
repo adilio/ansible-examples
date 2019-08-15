@@ -1,0 +1,7 @@
+---
+
+dependencies:
+  - role: lin_network_restart
+  - role: lin_ssh_restart
+  - role: write_changelog
+

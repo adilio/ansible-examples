@@ -1,0 +1,8 @@
+---
+- name: add changelog entry for Windows
+  win_shell: "{{ item }} | Add-Content C:\\DRS\\Logs\\changelog.txt"
+  loop:
+    - "Get-Date -Format 'dd-MMM-yyyy HH:mm'"
+    - "echo '{{ cl_message }}'"
+    - "echo ''"
+

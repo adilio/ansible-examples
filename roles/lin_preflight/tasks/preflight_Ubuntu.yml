@@ -1,0 +1,77 @@
+---
+
+- name: Set LOCALE to en_US with localectl
+  shell: localectl set-locale LANG=en_US.UTF-8
+
+- name: Apt update cache
+  apt:
+    update_cache: yes
+
+- name: Install some common programs...
+  apt: name={{ item }} state=present
+  loop:
+    #- postfix
+    - glances
+    - htop
+    - ranger
+    - tmux
+    - atool
+    - highlight
+    - vim
+    - unzip
+  notify: add changelog entry
+
+- name: Remove annoying programs
+  apt: name={{ item }} state=absent purge=yes
+  loop:
+    - aide
+
+- name: add DNS suffxes
+  lineinfile:
+    dest: /etc/network/interfaces
+    state: present
+    backup: yes
+    line: 'dns-search bis.it.ubc.ca ead.ubc.ca ubc.ca'
+
+  notify:
+    - restart network
+    - add changelog entry
+
+- name: Fix hostname in /etc/mailname
+  replace:
+    path: /etc/mailname
+    regexp: '.*'
+    replace: "{{ ansible_hostname | lower }}"
+
+- name: Comment out *_transport lines
+  replace:
+    path: /etc/postfix/main.cf
+    backup: yes
+    regexp: '(^[a-z].*_transport = error)'
+    replace: '#\1'
+  
+  notify:
+    - restart postfix
+
+- name: Stop idle ssh timeouts
+  lineinfile:
+    dest: /etc/ssh/sshd_config
+    state: present
+    regexp: '^ClientAliveCountMax .*$'
+    line: 'ClientAliveCountMax 0'
+
+  notify:
+    - restart ssh
+    - add changelog entry
+
+- name: Stop idle ssh timeouts
+  lineinfile:
+    dest: /etc/ssh/sshd_config
+    state: present
+    regexp: '^ClientAliveInterval.*$'
+    line: 'ClientAliveInterval 0'
+
+  notify:
+    - restart ssh
+    - add changelog entry
+

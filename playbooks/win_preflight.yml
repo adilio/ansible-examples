@@ -1,0 +1,19 @@
+---
+# Windows Pre-Flight Playbook
+# To be run on new Windows VM's
+# after bootstrap steps are complete
+- name: Windows Pre-Flight steps
+  hosts:
+#  - server1.example.com
+#  gather_facts: yes
+  gather_facts: yes
+
+  roles:
+  - role: win_firewall_rules
+  - role: win_net_settings
+  - role: win_preferences
+  - role: win_install_pkgs
+
+  vars:
+    cl_message: "Windows Pre-Flight was run via Ansible"
+

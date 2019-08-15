@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# {{ ansible_managed }}
+# Source: {{ template_fullpath }}
+# Host: {{ template_host }}
+# Tested on: Ubuntu 12.04, 14.04, 16.04
+
+now=$(date +%Y%m%d%H%M)
+server=$(hostname)
+server=${server%%.*}
+updatelog=/opt/drs/log/update_${now}.log
+sender=no-reply@ubc.ca
+email={{ bis_systems_email }}
+
+# purge updatelog files older than a year
+find /opt/drs/log -name 'update_[0-9]*.log' ! -newermt '-365 days' | xargs -r rm
+
+echo "aptitude update on $server" | tee -a $updatelog
+echo "" | tee -a $updatelog
+aptitude update -q=2 | tee -a $updatelog
+echo "" | tee -a $updatelog
+
+echo "aptitude full-upgrade" | tee -a $updatelog
+echo "" | tee -a $updatelog
+aptitude -y full-upgrade | tee -a $updatelog
+echo "" | tee -a $updatelog
+
+echo "aptitude clean" | tee -a $updatelog
+echo "" | tee -a $updatelog
+aptitude clean | tee -a $updatelog
+echo "" | tee -a $updatelog
+
+echo "apt-get autoremove" | tee -a $updatelog
+echo "" | tee -a $updatelog
+apt-get -y autoremove --purge | tee -a $updatelog
+echo "" | tee -a $updatelog
+
+if grep -qi "No packages will be " $updatelog ; then
+ strsubj="No Updates to Install"
+else
+ strsubj="Updates Completed"
+fi
+
+#if grep -q 'E: \|W: ' ${updatelog} ; then
+# only detect errors, not warnings
+if grep -q 'E: ' ${updatelog} ; then
+ strerr=", errors detected"
+else
+ strerr=""
+fi
+
+# strip duplicate blank lines
+sed -i 'N;/^\n$/D;P;D;' $updatelog
+
+mail -s "[$server] ${strsubj}${strerr}" -a "FROM:$sender" ${email} < ${updatelog}
+

@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# {{ ansible_managed }}
+# Source: {{ template_fullpath }}
+# Host: {{ template_host }}
+
+/opt/drs/bin/update-{{ ansible_distribution|lower }}
+
+sleep 2
+
+/opt/drs/bin/notify-restart

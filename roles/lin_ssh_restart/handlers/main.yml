@@ -1,0 +1,28 @@
+---
+# There appears to be a bug with the system module in that it does not restart the
+# SSH service for RHEL 6 or Ubuntu 14. As a result, the command module is used to
+# restart the service
+ 
+- name: restart SSH via command RHEL
+  command: service sshd restart
+  when: ansible_os_family == "RedHat" and ansible_distribution_major_version == "6"
+  listen: "restart ssh"
+
+- name: restart SSH via service RHEL
+  systemd:
+    name: sshd.service
+    state: restarted
+  when: ansible_os_family == "RedHat" and ansible_distribution_major_version == "7"
+  listen: "restart ssh"
+
+- name: restart SSH via command Ubuntu
+  command: service ssh restart
+  when: ansible_os_family == "Debian" and ansible_distribution_major_version == "14"
+  listen: "restart ssh"
+
+- name: restart SSH via service Ubuntu
+  systemd:
+    name: ssh.service
+    state: restarted
+  when: ansible_os_family == "Debian" and ansible_distribution_major_version == "16"
+  listen: "restart ssh"

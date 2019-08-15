@@ -1,0 +1,329 @@
+---
+# windows - setup win_sql_maintenance role
+# TODO: support for multiple SQL server instances, currently only processes first instance
+# - role only works on SQL Server 2008R2 and newer
+
+- name: Check if SQL Server installed
+# this check doesn't work on:
+# - SQL Server 2008 ie. bis-moaebi-p, bis-moadvm-p
+# - SQL Server 2012 Express Edition ie. bis-sqlsen-prd
+  win_shell: |
+    If (Test-Path "HKLM:\Software\Microsoft\Microsoft SQL Server\Instance Names\SQL") { Write-Output $true }
+    Else { Write-Output $false }
+  register: sql_find_result
+  changed_when: false
+  ignore_errors: true
+  when: sm_enable
+
+- name: If SQL Server installed, get first instance name
+  win_shell: |
+    $i = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server").InstalledInstances[0]
+    If ($i -ne $null) {
+      $i = ".\$i" -replace ("MSSQLSERVER","")
+      Write-Output $i
+    }
+  register: sql_instance_result
+  changed_when: false
+  when:
+    - sm_enable
+    - sql_find_result.stdout_lines[0] == 'True'
+
+- name: Set facts if SQL Server installed and instance defined
+  set_fact:
+    bis_ans_sql_server_installed: true
+    bis_ans_sql_server_instance_name: '{{ sql_instance_result.stdout_lines[0] }}'
+    cacheable: yes
+  when:
+    - sm_enable
+    - sql_find_result.stdout_lines[0] == 'True'
+    - sql_instance_result.stdout_lines|length > 0
+
+# the else statement
+- name: Set fact if SQL Server not installed
+  set_fact:
+    bis_ans_sql_server_installed: false
+    cacheable: yes
+  when:
+    - sm_enable
+    - sql_find_result.stdout_lines[0] == 'False'
+
+# this should probably be done as another role that sets custom facts which can be run in the play
+# the odd hackery of generating $i is to get around the escaping of backslashes by Ansible such that
+# a single \ is sent as a \\ to Powershell in win_shell
+- name: If SQL Server installed, return list of databases
+  win_shell: |
+    $bs2 = [char][int]92+[char][int]92
+    $bs1 = [char][int]92
+    $i = '{{ bis_ans_sql_server_instance_name }}'.Replace($bs2,$bs1)
+    sqlcmd.exe -S $i -Q "SET NOCOUNT ON; SELECT name FROM sys.databases WHERE name != 'tempdb';" -W -h -1
+  register: db_result
+  changed_when: false
+  when:
+    - sm_enable
+    - bis_ans_sql_server_installed
+
+- name: If SQL Server installed, get SQL Server version
+  win_shell: |
+    $bs2 = [char][int]92+[char][int]92
+    $bs1 = [char][int]92
+    $i = '{{ bis_ans_sql_server_instance_name }}'.Replace($bs2,$bs1)
+    sqlcmd.exe -S $i -Q "SET NOCOUNT ON; SELECT @@VERSION;" -W -h -1
+  register: db_ver_result
+  changed_when: false
+  when:
+    - sm_enable
+    - bis_ans_sql_server_installed
+
+- name: Set facts for SQL Server version number and databases present
+  set_fact:
+    bis_ans_sql_server_version_string: "{{ db_ver_result.stdout_lines }}"
+    bis_ans_sql_server_version: "{{ (db_ver_result.stdout_lines[0].split())[:4]|join(' ') }}"
+    bis_ans_sql_server_databases: "{{ db_result.stdout_lines }}"
+    cacheable: yes
+  when:
+    - sm_enable
+    - bis_ans_sql_server_installed
+
+- name: Create SQL login account for backup task
+  win_shell: |
+    $bs2 = [char][int]92+[char][int]92
+    $bs1 = [char][int]92
+    $i = '{{ bis_ans_sql_server_instance_name }}'.Replace($bs2,$bs1)
+    sqlcmd.exe -S $i -Q "CREATE LOGIN [{{ sm_sql_username }}] FROM WINDOWS WITH DEFAULT_DATABASE=[master], DEFAULT_LANGUAGE=[us_english]; " -W
+  register: db_acct_create_result
+  changed_when:
+    - db_acct_create_result is succeeded
+    - db_acct_create_result.stdout_lines|length == 0
+  when:
+    - sm_enable
+    - bis_ans_sql_server_installed
+  notify: add changelog entry
+
+- name: Set sysadmin role to SQL login account for backup task
+  win_shell: |
+    $bs2 = [char][int]92+[char][int]92
+    $bs1 = [char][int]92
+    $i = '{{ bis_ans_sql_server_instance_name }}'.Replace($bs2,$bs1)
+    sqlcmd.exe -S $i -Q "IF (SELECT COUNT(*) FROM sys.server_role_members AS SRM JOIN sys.server_principals AS SP ON SRM.Role_principal_id = SP.principal_id JOIN sys.server_principals AS SP2 ON SRM.member_principal_id = SP2.principal_id WHERE SP2.name = '{{ sm_sql_username }}' AND SP.name = 'sysadmin') = 0 ALTER SERVER ROLE [sysadmin] ADD MEMBER [{{ sm_sql_username }}]; ELSE print 'Role member exists already'; " -W
+  register: db_acct_role_result
+  changed_when:
+    - db_acct_role_result is succeeded
+    - db_acct_role_result.stdout_lines|length == 0
+  when:
+    - sm_enable
+    - bis_ans_sql_server_installed
+  notify: add changelog entry
+
+# does backup location exist?
+- name: Test if default backup location exists
+  win_shell: 'Test-Path {{ sm_bk_location }}'
+  register: sm_bk_location_result
+  changed_when: false
+  when:
+    - sm_enable
+    - bis_ans_sql_server_installed
+
+- name: Set fact if default backup location exists
+  set_fact:
+    bis_ans_sql_backup_location: '{{ sm_bk_location }}'
+    cacheable: yes
+  when:
+    - sm_enable
+    - bis_ans_sql_server_installed
+    - sm_bk_location_result.stdout_lines[0] == 'True'
+
+- name: If default backup location doesn't exist, find alternate
+  win_shell: |
+    $bk = (Get-PSDrive -PSProvider FileSystem -Scope Local | ? {$_ -notin ("A","C") -and $( Join-Path $_.Root "Backup" | Test-path )} ).Root
+    $bk0 = $bk
+    If ($bk.Count -gt 1) { $bk0 = $bk[0] }
+    If ($bk0 -ne $null) { Join-Path $bk0 "Backup" | Write-Output }
+  register: sm_bk_find_location_result
+  changed_when: false
+  when:
+    - sm_enable
+    - bis_ans_sql_server_installed
+    - sm_bk_location_result.stdout_lines[0] == 'False'
+
+- name: Set fact if alternate backup location exists
+  set_fact:
+    bis_ans_sql_backup_location: '{{ sm_bk_find_location_result.stdout_lines[0] }}'
+    cacheable: yes
+  when:
+    - sm_enable
+    - bis_ans_sql_server_installed
+    - sm_bk_location_result.stdout_lines[0] == 'False'
+    - sm_bk_find_location_result.stdout_lines|length > 0
+
+- name: If no backup locations exist, reminder to create it
+  fail:
+    msg: 'No valid backup locations exist, please create directory ie. {{ sm_bk_location }} and re-apply this role.'
+  when:
+    - sm_enable
+    - bis_ans_sql_server_installed
+    - sm_bk_location_result.stdout_lines[0] == 'False'
+    - sm_bk_find_location_result.stdout_lines|length == 0
+
+# backup location permissions
+- name: Set acl on backup location for SQL login account
+  win_acl:
+    #inherit: ContainerInherit, ObjectInherit
+    path: '{{ bis_ans_sql_backup_location }}'
+    #propagation: 'None'
+    rights: Modify
+    state: present
+    type: allow
+    user: '{{ sm_sql_username }}'
+  when:
+    - sm_enable
+    - bis_ans_sql_server_installed
+    - bis_ans_sql_backup_location is defined
+
+- name: Copy sql_maintenance_ps folder and files recursively
+  win_copy:
+    src: 'sql_maintenance_ps'
+    dest: 'C:\DRS\Scripts'
+  when:
+    - sm_enable
+    - bis_ans_sql_server_installed
+  notify: add changelog entry
+
+- name: Copy over templated sql_maintenance_ps config files
+  win_template:
+    src: '{{ item.src }}'
+    dest: '{{ item.dest }}'
+    force: yes
+  loop:
+    - { src: 'sqlbkpconfig.xml', dest: 'C:\DRS\Scripts\sql_maintenance_ps\etc\sqlbkpconfig.xml' }
+    - { src: 'emailconfig.xml', dest: 'C:\DRS\Scripts\sql_maintenance_ps\etc\emailconfig.xml' }
+  when:
+    - sm_enable
+    - bis_ans_sql_server_installed
+  notify: add changelog entry
+
+- name: Create scheduled task sql_maintenance_ans
+  win_scheduled_task:
+    name: sql_maintenance_ans
+    actions:
+    - path: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+      working_directory: C:\DRS\Scripts\sql_maintenance_ps
+      arguments: -ExecutionPolicy Bypass -File C:\DRS\Scripts\sql_maintenance_ps\sql_maintenance.ps1
+    allow_demand_start: yes
+    allow_hard_terminate: no
+    author: 'EAD\hikaru51.adm'
+    date: '2019-06-26T10:00:00'
+    description: SQL Maintenance and Backup - deployed by Ansible role win_sql_maintenance
+    disallow_start_if_on_batteries: no
+    enabled: yes
+    execution_time_limit: 'PT12H'
+    hidden: no
+    logon_type: password
+    multiple_instances: 2
+    password: "{{ vault_bis_svc_dbbackup }}"
+    run_level: highest
+    run_only_if_idle: no
+    run_only_if_network_available: no
+    state: present
+    stop_if_going_on_batteries: no
+    triggers:
+    - execution_time_limit: 'PT12H'
+      start_boundary: '{{ sm_st_start_boundary }}'
+      enabled: yes
+      type: daily
+    update_password: no
+    username: '{{ sm_sql_username }}'
+    version: 1.3
+    wake_to_run: no
+  when:
+    - sm_enable
+    - bis_ans_sql_server_installed
+  notify: add changelog entry
+
+# batch logon rights for sql account needs ntrights.exe WSVR2003 Resource Kit tool
+# no simple powershell command for this
+- name: Check if batch logon rights set already for SQL login account
+  win_stat:
+    path: 'C:\DRS\Scripts\sql_maintenance_ps\sepriv.out'
+    get_checksum: no
+    get_md5: no
+  register: sepriv_stat_result
+  when:
+    - sm_enable
+    - bis_ans_sql_server_installed
+
+- name: Copy ntrights.exe tool to set batch logon rights for SQL login account
+  win_copy:
+    src: 'ntrights.exe'
+    dest: 'C:\DRS\Software\'
+    local_follow: yes
+  when:
+    - sm_enable
+    - bis_ans_sql_server_installed
+    - not sepriv_stat_result.stat.exists
+  notify: add changelog entry
+
+- name: Grant batch logon rights to SQL login account
+  win_shell: |
+    C:\DRS\Software\ntrights.exe -u {{ sm_sql_username }} +r SeBatchLogonRight > C:\DRS\Scripts\sql_maintenance_ps\sepriv.out
+    If (Test-Path C:\DRS\Scripts\sql_maintenance_ps\sepriv.out) {
+      If ($(Select-String successful C:\DRS\Scripts\sql_maintenance_ps\sepriv.out) -eq $null) { Remove-Item C:\DRS\Scripts\sql_maintenance_ps\sepriv.out }
+      Else { Remove-Item C:\DRS\Software\ntrights.exe }
+    }
+  args:
+    creates: 'C:\DRS\Scripts\sql_maintenance_ps\sepriv.out'
+  register: db_acct_setrights_result
+  when:
+    - sm_enable
+    - bis_ans_sql_server_installed
+    - not sepriv_stat_result.stat.exists
+
+- name: Remove scheduled task sql_maintenance_ans to disable win_sql_maintenance role
+  win_scheduled_task:
+    name: sql_maintenance_ans
+    state: absent
+  when: not sm_enable
+  notify: add changelog entry
+
+- name: Remove sql_maintenance_ps folder to disable win_sql_maintenance role
+  win_file:
+    path: 'C:\DRS\Scripts\sql_maintenance_ps'
+    state: absent
+  when: not sm_enable
+  notify: add changelog entry
+
+# remove batch logon rights?
+# remove backup location permissions?
+
+# Cleanup artifacts
+# confirmed that all existing sql maintenance tasks start at 6:30PM
+- name: Delete old scheduled tasks
+  win_scheduled_task:
+    name: "{{ item }}"
+    state: absent
+  loop:
+    - 'SQL Maintenance'
+    - 'sql_maintenance'
+  when:
+    - sm_enable
+    - bis_ans_sql_server_installed
+  notify: add changelog entry
+
+- name: Find any old sql_maintenance script locations
+  win_find:
+    paths: 'C:\DRS\Scripts'
+    patterns: 'sql_maintenance'
+    file_type: directory
+    recurse: no
+  register: sm_script_find_result
+  when:
+    - sm_enable
+    - bis_ans_sql_server_installed
+
+- name: Rename old sql_maintenance script locations
+  win_shell: Rename-Item -Path C:\DRS\Scripts\sql_maintenance -NewName C:\DRS\Scripts\sql_maintenance_old
+  when:
+    - sm_enable
+    - bis_ans_sql_server_installed
+    - sm_script_find_result.matched == 1
+  notify: add changelog entry
+

@@ -1,0 +1,8 @@
+---
+- name: add changelog entry for Linux
+  shell: "echo {{ item }} >> /opt/drs/log/changelog.txt"
+  loop:
+    - "`date` - {{ ansible_user_id }}@bis-appans-p01"
+    - "'*' {{ cl_message }}"
+    - ""
+

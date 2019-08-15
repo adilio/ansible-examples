@@ -1,0 +1,8 @@
+---
+- name: Install reqs for yum/redhat
+  yum: name={{ item }} state=present
+  loop:
+    - 'postfix'
+    - 'yum-utils'
+  when: mw_enable == 'True'
+

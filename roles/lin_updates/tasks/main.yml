@@ -1,0 +1,5 @@
+---
+- include_tasks: update_{{ ansible_distribution }}.yml
+#  when: ansible_distribution == "RedHat"
+#- include_tasks: update_ubuntu.yml
+#  when: ansible_distribution == "Ubuntu"

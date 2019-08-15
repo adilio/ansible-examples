@@ -1,0 +1,15 @@
+---
+- name: Install reqs for apt/ubuntu
+  apt: name={{ item }} state=present
+  loop:
+    - 'postfix'
+    - 'aptitude'
+  when: mw_enable == 'True'
+
+- name: Cleanup artifacts
+  file:
+    path: '{{ item }}'
+    state: absent
+  loop:
+    - '/opt/drs/bin/check-new-kernel'
+

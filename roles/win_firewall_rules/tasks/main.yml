@@ -1,0 +1,13 @@
+---
+# set initial firewall rules
+- name: Copy Set-FirewallRules.ps1 file
+  win_copy:
+    src: 'Set-FirewallRules.ps1'
+    dest: 'C:\DRS\Scripts\Set-FirewallRules.ps1'
+
+
+- name: Run Set-FirewallRules.ps1 script
+  win_shell: C:\DRS\Scripts\Set-FirewallRules.ps1
+  args:
+    creates: 'C:\DRS\Logs\Set-FirewallRules.txt'
+  notify: add changelog entry

@@ -1,0 +1,41 @@
+---
+
+- name: Copy Install Files
+  win_copy:
+    src: "{{ item }}"
+    dest: 'C:/DRS/Software/'
+  loop:
+    - 7z1805-x64.msi
+    - npp.7.6.1.Installer.exe
+    - BgInfo.zip
+
+- name: Unpack BgInfo into ProgramFiles
+  win_unzip:
+    src: 'C:/DRS/Software/BgInfo.zip'
+    dest: 'C:/Program Files/'
+    creates: 'C:/Program Files/BgInfo'
+
+- name: Intstall 7zip
+  win_package:
+    path: 'C:\DRS\Software\7z1805-x64.msi'
+    arguments: /quiet /norestart
+    state: present
+
+- name: Install Notepad++
+  win_package:
+    path: 'C:\DRS\Software\npp.7.6.1.Installer.exe'
+    arguments: /S
+    product_id: 'Notepad++'
+    #creates: 'C:\\Program Files (x86)\\Notepad++'
+    state: present
+
+    
+- name: Set up BgInfo Shortcut
+  win_shortcut:
+    src: 'C:\Program Files\BgInfo\BgInfo.exe'
+    dest: 'C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\Bginfo.lnk'
+    args: 'vss.bgi /NOLICPROMPT /SILENT /TIMER:0'
+    description: 'BgInfo Application'
+    directory: 'C:\Program Files\BgInfo'
+    state: present
+

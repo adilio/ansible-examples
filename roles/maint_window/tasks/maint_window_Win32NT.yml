@@ -1,0 +1,150 @@
+---
+# windows - setup maintenance window
+- name: Create windowsupdate_ps directory structure
+  win_file:
+    path: 'C:\DRS\Scripts\{{ item }}'
+    state: directory
+  loop:
+    - 'windowsupdate_ps'
+    - 'windowsupdate_ps\PSWindowsUpdate'
+  when: mw_enable == 'True'
+  notify: add changelog entry
+
+- name: Copy PSWindowsUpdate files
+  win_copy:
+    src: 'PSWindowsUpdate/'
+    dest: 'C:\DRS\Scripts\windowsupdate_ps\PSWindowsUpdate\'
+  when: mw_enable == 'True'
+  notify: add changelog entry
+
+- name: Copy over templated windowsupdate_ps files
+  win_template:
+    src: '{{ item.src }}'
+    dest: '{{ item.dest }}'
+    force: yes
+  loop:
+    - { src: 'windowsupdate_ps/maintenance_windows_update2.xml', dest: 'C:\DRS\Scripts\windowsupdate_ps\maintenance_windows_update.xml' }
+    - { src: 'windowsupdate_ps/windowsupdate_ps.ps1', dest: 'C:\DRS\Scripts\windowsupdate_ps\windowsupdate_ps.ps1' }
+  when: mw_enable == 'True'
+  notify: add changelog entry
+
+# The win_scheduled_task module block must be repeated and selected with a when conditional due to issue
+# with the triggers argument, weeks_of_month, not handling the case of mw_week == "L" or last week of the
+# month. See note below. Tested on Ansible 2.6 2018-08-28 --DL
+# - the only arguments that are different are
+#   - weeks_of_month
+#   - run_on_last_week_of_month
+- name: Create scheduled task maintenance_windows_update_ans for last week
+  win_scheduled_task:
+    name: maintenance_windows_update_ans
+    actions:
+    - path: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+      working_directory: C:\DRS\Scripts\windowsupdate_ps
+      arguments: -ExecutionPolicy Bypass -File C:\DRS\Scripts\windowsupdate_ps\windowsupdate_ps.ps1
+    allow_demand_start: yes
+    allow_hard_terminate: yes
+    author: EAD\adill.adm
+    date: '2019-03-10T10:00:00-7:00'
+    description: Monthly Maintenance Windows Updates - deployed by Ansible role maint_window
+    disallow_start_if_on_batteries: no
+    enabled: yes
+    execution_time_limit: 'PT2H'
+    hidden: no
+    logon_type: service_account
+    multiple_instances: 2
+    run_level: highest
+    run_only_if_idle: no
+    run_only_if_network_available: no
+    state: present
+    stop_if_going_on_batteries: no
+    triggers:
+    - execution_time_limit: 'PT2H'
+      start_boundary: '2019-03-10T{{ (mw_time|length == 4)|ternary("0"+mw_time,mw_time) }}:00-7:00'
+      enabled: yes
+      run_on_last_week_of_month: yes
+      days_of_week: '{{ mw_dayname }}'
+      # weeks_of_month does not accept 'Last', only values from 1-4
+      # for case of mw_week == "L", this argument must not be included with run_on_last_week_of_month: true
+      # or it takes precedence! The built-in var omit does not work for 2nd-level arguments either.
+      #weeks_of_month: '{{ (mw_week == "L")|ternary(omit,mw_week) }}'
+      months_of_year: "{% for m in mw_months %}{% if loop.index0%mw_mwf|int == 0 %}{{ m }}{% if loop.index0+mw_mwf|int < loop.length %},{% endif %}{% endif %}{% endfor %}"
+      type: monthlydow
+    username: SYSTEM
+    version: 1.3
+    wake_to_run: no
+  when:
+    - mw_enable == "True"
+    - mw_week == "L"
+  notify: add changelog entry
+
+- name: Create scheduled task maintenance_windows_update_ans for other weeks
+  win_scheduled_task:
+    name: maintenance_windows_update_ans
+    actions:
+    - path: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+      working_directory: C:\DRS\Scripts\windowsupdate_ps
+      arguments: -ExecutionPolicy Bypass -File C:\DRS\Scripts\windowsupdate_ps\windowsupdate_ps.ps1
+    allow_demand_start: yes
+    allow_hard_terminate: yes
+    author: EAD\adill.adm
+    date: '2019-03-10T10:00:00-7:00'
+    description: Monthly Maintenance Windows Updates - deployed by Ansible role maint_window
+    disallow_start_if_on_batteries: no
+    enabled: yes
+    execution_time_limit: 'PT2H'
+    hidden: no
+    logon_type: service_account
+    multiple_instances: 2
+    run_level: highest
+    run_only_if_idle: no
+    run_only_if_network_available: no
+    state: present
+    stop_if_going_on_batteries: no
+    triggers:
+    - execution_time_limit: 'PT2H'
+      start_boundary: '2019-03-10T{{ (mw_time|length == 4)|ternary("0"+mw_time,mw_time) }}:00-7:00'
+      enabled: yes
+      run_on_last_week_of_month: no
+      days_of_week: '{{ mw_dayname }}'
+      weeks_of_month: '{{ mw_week }}'
+      months_of_year: "{% for m in mw_months %}{% if loop.index0%mw_mwf|int == 0 %}{{ m }}{% if loop.index0+mw_mwf|int < loop.length %},{% endif %}{% endif %}{% endfor %}"
+      type: monthlydow
+    username: SYSTEM
+    version: 1.3
+    wake_to_run: no
+  when:
+    - mw_enable == "True"
+    - mw_week != "L"
+  notify: add changelog entry
+
+#- debug:
+#    msg: "{{ mw_mwf }}"
+
+#- debug:
+#    msg: "{% for m in mw_months %}{% if loop.index0%mw_mwf|int == 0 %}{{ m }}{% if loop.index0+mw_mwf|int < loop.length %},{% endif %}{% endif %}{% endfor %}"
+
+- name: Remove scheduled task maintenance_windows_update_ans to disable maint_window role
+  win_scheduled_task:
+    name: maintenance_windows_update_ans
+    state: absent
+  when: mw_enable == 'False'
+  notify: add changelog entry
+
+- name: Remove windowsupdate_ps directory structure to disable maint_window role
+  win_file:
+    path: 'C:\DRS\Scripts\{{ item }}'
+    state: absent
+  loop:
+    - 'windowsupdate_ps\PSWindowsUpdate'
+    - 'windowsupdate_ps'
+  when: mw_enable == 'False'
+  notify: add changelog entry
+
+# Cleanup artifacts
+- name: Delete old scheduled task maintenance_windows_update
+  win_command: schtasks.exe /DELETE /TN "maintenance_windows_update" /F
+  args:
+    removes: C:\Windows\System32\Tasks\maintenance_windows_update
+  register: schtasks_delete_out
+  notify: add changelog entry
+

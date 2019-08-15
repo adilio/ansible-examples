@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+# Source: {{ template_fullpath }}
+# Host: {{ template_host }}
+# Tested on: RHEL 6.9, 7.4 | CentOS 6.9
+
+SHELL=/bin/sh
+PATH=/root/drs/bin:/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
+LANG="en_US.UTF8"
+# Cron task to upgrade system and notify if a system restart is required.
+#
+{{ mw_min }} {{ mw_hour }} * {{ mw_month_freq }} {{ mw_day }}     root    /opt/drs/bin/run-if-today {{ mw_week }} && /opt/drs/bin/upgrade-notify
+

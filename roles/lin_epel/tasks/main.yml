@@ -1,0 +1,39 @@
+---
+
+
+- name: Check if EPEL repo is already configured.
+  stat: path={{ epel_repofile_path }}
+  register: epel_repofile_result
+  when: 
+    - ansible_os_family == 'RedHat'
+
+- debug:
+    var: epel_repofile_result
+    verbosity: 2
+
+ 
+- name: Install EPEL repo.
+  yum:
+    name: "{{ epel_repo_url }}"
+    state: present
+  register: result
+  when:
+    - epel_repofile_result.stat.exists == False
+    - ansible_os_family == 'RedHat'
+
+ 
+- name: Import EPEL GPG key.
+  rpm_key:
+    key: "{{ epel_repo_gpg_key_url }}"
+    state: present
+  when: 
+    #- epel_repofile_result.stat.exists == False
+    - ansible_os_family == "RedHat"
+      
+
+- name: Install EPEL only pagkages
+  yum: name={{ item }} state=installed
+  loop:
+    #- glances
+    - htop
+    - tmux

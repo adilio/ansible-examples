@@ -1,0 +1,13 @@
+---
+- name: Set initial DNS and Network settings for Winodws Pre-flight
+  hosts:
+#  - server1.example.com
+#  gather_facts: yes
+  gather_facts: yes
+
+  vars:
+    cl_message: "Set initial DNS and Network settings via Ansible"
+
+  roles:
+  - role: win_net_settings
+

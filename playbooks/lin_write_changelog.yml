@@ -1,0 +1,17 @@
+---
+# make a change on a host and write to the changelog
+
+- hosts: ANS:&ans-ults*
+  gather_facts: yes
+
+  tasks:
+  - include_role:
+      name: write_changelog
+    vars:
+      cl_message: "This amazing playbook will write to the changelog"
+        
+  - name: update apt and write to changelog 
+    apt:
+      update_cache: yes
+
+    notify: add changelog entry

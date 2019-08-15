@@ -1,0 +1,35 @@
+[{
+	"sqlserver" : {
+		"instance" : {
+			"name" : "localhost"
+		},
+		"databases" : {
+			"name" : ["master", "model", "msdb"]
+		},
+		"options" : {
+			"cleanup_files" : {
+				"enabled" : false,
+				"source_folder" : "",
+				"file_age_days" : 0
+			},
+			"check_integrity" : {
+				"enabled" : false
+			},
+			"index_defrag" : {
+				"enabled" : false
+			},
+			"update_statistics" : {
+				"enabled" : false
+			},
+			"backup_database" : {
+				"enabled" : false,
+				"destination_folder" : ""
+			},
+			"move_files" : {
+				"enabled" : false,
+				"source_folder" : "",
+				"destination_folder" : ""
+			}
+		}
+	}
+}]

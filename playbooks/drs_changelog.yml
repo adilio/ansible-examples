@@ -1,0 +1,13 @@
+---
+- name: create drs and changelog
+#  hosts: ANS
+  hosts:
+#  - server1.example.com
+#  gather_facts: yes
+
+  vars:
+    cl_message: "Created drs folders and changelog via Ansible role drs_changelog"
+
+  roles:
+  - role: drs_changelog
+  - role: write_changelog

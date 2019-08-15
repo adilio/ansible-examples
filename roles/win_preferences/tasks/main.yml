@@ -1,0 +1,78 @@
+---
+# Set initial misc. regkeys and prefs. for Winodws Pre-flight
+- name: Regkey to turn off UAC consent prompt for Admins
+  win_regedit:
+    path: HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System
+    name: ConsentPromptBehaviorAdmin
+    data: 0
+    type: dword
+
+- name: Regkey to not open Server Manager every logon
+  win_regedit:
+    path: HKLM:\SOFTWARE\Microsoft\ServerManager
+    name: DoNotOpenServerManagerAtLogon
+    data: 1
+    type: dword
+
+- name: Regkey to not open initial config. settings every logon
+  win_regedit:
+    path: HKLM:\SOFTWARE\Microsoft\ServerManager\Oobe
+    name: DoNotOpenInitialConfigurationTasksAtLogon
+    data: 1
+    type: dword
+
+- name: Disable IE Enhanced Security Config. for Admins
+  win_regedit:
+    path: HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}
+    name: IsInstalled
+    data: 0
+    type: dword
+
+- name: Show extensions for known file types (step 1)
+  win_regedit:
+    path: HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced\Folder\HideFileExt
+    name: DefaultValue
+    data: 0
+    type: dword
+
+- name: Show extensions for known file types (step 2)
+  win_regedit:
+    path: HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced\Folder\HideFileExt
+    name: CheckedValue
+    data: 0
+    type: dword
+
+- name: Reset WSUS Client ID
+  win_shell: |
+    net stop wuauserv
+    REG DELETE "HKLM\Software\Microsoft\Windows\CurrentVersion\WindowsUpdate" /v SusClientId /f
+    net start wuauserv
+    wuauclt /resetauthorization /detectnow
+    Add-Content -Value "[$(Get-Date -Format 'dd-MMM-yyyy HH:mm')]
+    WSUS ClientID reset via Ansible
+    Existence of this logfile will skip subsequent runs of ths role.
+    If you'd like to re-apply the role, delete this file." -Path 'C:\DRS\Logs\WSUS-Reset.txt'
+  args:
+    creates: 'C:\DRS\Logs\WSUS-Reset.txt'
+
+- name: Activate Windows Server 2016
+  win_shell: |
+    cscript.exe /B c:\windows\system32\slmgr.vbs /ipk WC2BQ-8NRM3-FDDYY-2BFGV-KHKQY
+    cscript.exe /B c:\windows\system32\slmgr.vbs /skms kms1.it.ubc.ca
+    Start-Sleep -Seconds 5
+    cscript.exe /B c:\windows\system32\slmgr.vbs /ato
+    Add-Content -Value "[$(Get-Date -Format 'dd-MMM-yyyy HH:mm')]
+    Activated Windows Server 2016 via Ansible
+    Existence of this logfile will skip subsequent runs of ths role.
+    If you'd like to re-apply the role, delete this file." -Path 'C:\DRS\Logs\Win-Activate.txt'
+  args:
+    creates: 'C:\DRS\Logs\Win-Activate.txt'
+  when: ('2016' in ansible_os_name)
+
+- name: Uninstall Windows Defender
+  win_feature:
+    name: Windows-Defender
+    state: absent
+  when: ('2016' in ansible_os_name)
+  notify: add changelog entry
+

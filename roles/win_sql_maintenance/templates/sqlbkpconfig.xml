@@ -1,0 +1,66 @@
+<!--#####################################################################################
+#
+# {{ ansible_managed }}
+# Source: {{ template_fullpath }}
+# Host: {{ template_host }}
+#
+# v1.05 2012-12-06 created by Michael Pal
+# v1.06 2019-06-07 DL
+# - removed unused <logs>, renamed to sqlbkpconfig.xml for Ansible automation
+# 
+#####################################################################################-->
+
+
+<config>
+	<sqlserver>
+		<instance>
+{% if bis_ans_sql_server_instance_name == '.\\' %}
+			<name>{{ sm_bk_inst_svr_name|default(ansible_hostname|upper) }}</name>
+{% else %}
+			<name>{{ sm_bk_inst_svr_name|default(ansible_hostname|upper) }}{{ bis_ans_sql_server_instance_name[1:] }}</name>
+{% endif %}
+		</instance>
+		<version>
+			<number>{{ bis_ans_sql_server_version.split()[-1] }}</number>
+		</version>
+		<databases>
+{% for db in bis_ans_sql_server_databases 
+     if not db in sm_bk_skip_dbs|default(['']) %}
+			<name>{{ db }}</name>
+{% endfor %} 
+		</databases>
+		<options>
+			<cleanupFiles>
+				<enabled>1</enabled>
+{% if bis_ans_sql_backup_location is defined %}
+				<sourcefolder>{{ bis_ans_sql_backup_location }}</sourcefolder>
+{% else %}
+				<sourcefolder>{{ sm_bk_location }}</sourcefolder>
+{% endif %}
+				<fileagedays>{{ sm_bk_fileagedays }}</fileagedays>
+			</cleanupFiles>
+			<checkIntegrity>
+				<enabled>1</enabled>
+			</checkIntegrity>
+			<indexDefrag>
+				<enabled>1</enabled>
+			</indexDefrag>
+			<updateStatistics>
+				<enabled>0</enabled>
+			</updateStatistics>
+			<backupDatabase>
+				<enabled>1</enabled>
+{% if bis_ans_sql_backup_location is defined %}
+				<location>{{ bis_ans_sql_backup_location }}</location>
+{% else %}
+				<location>{{ sm_bk_location }}</location>
+{% endif %}
+			</backupDatabase>
+			<movefiles>
+				<enabled>0</enabled>
+				<sourcefolder></sourcefolder>
+				<targetfolder></targetfolder>
+			</movefiles>
+		</options>
+	</sqlserver>
+</config>

@@ -1,0 +1,12 @@
+---
+
+- name: reboot linux server
+  reboot:
+  when: ansible_system == 'Linux'
+  listen: 'reboot server'
+
+
+- name: reboot windows server
+  win_reboot:
+  when: ansible_system == 'Win32NT'
+  listen: 'reboot server'

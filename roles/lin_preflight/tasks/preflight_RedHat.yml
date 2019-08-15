@@ -1,0 +1,40 @@
+---
+
+- name: Set LOCALE to en_US with localectl
+  shell: localectl set-locale LANG=en_US.UTF-8
+  when: ansible_distribution_major_version == "7"
+
+- name: Install some common programs...
+  yum: name={{ item }} state=present
+  loop:
+    #- postfix
+    - yum-utils
+    - vim-enhanced
+    - unzip
+  notify: add changelog entry
+
+- name: Remove irritating programs
+  yum: name={{ item }} state=absent
+  loop:
+    - aide
+
+- name: add DNS suffxes for RHEL7
+  lineinfile:
+    dest: '/etc/sysconfig/network-scripts/ifcfg-{{ eth_interface }}'
+    state: present
+    backup: yes
+    line: 'SEARCH="bis.it.ubc.ca ead.ubc.ca ubc.ca"'
+  when: ansible_distribution_major_version == "7"
+  notify:
+    - restart network
+    - add changelog entry
+
+- name: add DNS suffxes for RHEL6
+  lineinfile:
+    dest: /etc/resolv.conf
+    state: present
+    backup: yes
+    line: 'search bis.it.ubc.ca ead.ubc.ca ubc.ca'
+  when: ansible_distribution_major_version == "6"
+  notify: add changelog entry
+

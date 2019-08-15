@@ -1,0 +1,16 @@
+---
+# sql_maintenance role default variables
+
+# these can be overridden in ~/ansible/host_vars for specific sql servers
+
+# setting to false disables the role
+sm_enable: true
+sm_bk_location: 'F:\Backup'
+sm_bk_fileagedays: 3
+sm_sql_username: 'EAD\bis-svc-dbbackup'
+sm_st_start_boundary: '2019-06-26T18:30:00'
+sm_st_email: '{{ bis_log_email }}'
+
+# array of databases to skip backup, define in per-host file
+#sm_bk_skip_dbs: ['master','model']
+

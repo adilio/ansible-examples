@@ -1,0 +1,63 @@
+---
+- name: upgrade all packages (Ubuntu)
+  apt:
+    #name: '*' # this is another way to do same
+    #state: latest
+    #upgrade: safe
+    upgrade: full
+    autoclean: yes
+    autoremove: yes
+    update_cache: yes
+  register: apt_out
+
+- debug:
+    var: apt_out
+    verbosity: 2
+
+- name: Mail result if STDOUT
+  mail:
+    to: "{{ admin_email }}"
+    subject: "[{{ ansible_hostname }}] - Updates Applied"
+    body: "{{ apt_out.stdout }}"
+  when: apt_out.stdout
+  
+- name: Mail result if STERR
+  mail:
+    to: "{{ admin_email }}"
+    subject: "[{{ ansible_hostname }}] - Apt Update Error"
+    body: "{{ apt_out.stderr }}"
+  when: apt_out.stderr
+
+- name: Mail if updates appied
+  mail:
+    to: "{{ admin_email }}"
+    from: "noreply@{{ ansible_hostname }}"
+    subject: "[{{ ansible_hostname }}] - Updates Applied(r)"
+    body: "{{ apt_out.stdout }}"
+  when: apt_out.stdout | search("^[1-9][0-9]* packages upgraded") #TODO regex for this
+
+- name: Mail if no updates
+  mail:
+    to: "{{ admin_email }}"
+    from: "noreply@{{ ansible_hostname }}"
+    subject: "[{{ ansible_hostname }}] - Up to Date"
+    body: "{{ apt_out.stdout }}"
+  when: apt_out.stdout | search("^0 packages upgraded")
+
+- name: Check if a reboot is required
+  register: file
+  stat: path=/var/run/reboot-required get_md5=no
+
+- name: Mail if reboot required
+  mail:
+    to: "{{ admin_email }}"
+    from: "noreply@{{ ansible_hostname }}"
+    subject: "[{{ ansible_hostname }}] - Reboot Required"
+    body: "File /var/run/reboot-required exists, reboot me!"
+  when:
+    - file.stat.exists == true
+#- name: Reboot the server
+  #command: /sbin/reboot
+  #when:
+    #- file.stat.exists == true
+    #- apt_out.stdout

@@ -1,0 +1,15 @@
+---
+# Windows Pre-Flight Playbook
+# To be run on new Windows VM's
+# after bootstrap steps are complete
+- name: Windows Install Pagkages
+  hosts:
+#  - server1.example.com
+#  gather_facts: yes
+  gather_facts: yes
+
+  roles:
+  - role: win_install_pkgs
+
+  vars:
+    cl_message: "Windows Install some pagkages run via Ansible"

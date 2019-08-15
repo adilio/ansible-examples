@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# {{ ansible_managed }}
+# Source: {{ template_fullpath }}
+# Host: {{ template_host }}
+# Tested on: Ubuntu 12.04, 14.04, 16.04
+
+server=$(hostname)
+server=${server%%.*}
+tmpfile=$(mktemp)
+sender=no-reply@ubc.ca
+email={{ bis_systems_email }}
+
+needreboot=0
+
+echo "Check if reboot of [$server] required from recent update: " | tee -a $tmpfile
+
+# similar to check-new-kernel script
+LAST_KERNEL=$(dpkg-query -l linux-image-[0-9.-]*-generic | grep '^ii' | awk '{print $3}' | sort -u | tail -1)
+CURRENT_KERNEL=$(cat /proc/version_signature | cut -d" " -f2 | cut -d- -f1-2)
+
+if [ $LAST_KERNEL = $CURRENT_KERNEL ]; then
+ echo "no reboot required, no change to kernel" | tee -a $tmpfile
+ echo "$CURRENT_KERNEL" | tee -a $tmpfile
+else
+ echo "reboot required, kernel change" | tee -a $tmpfile
+ echo "$CURRENT_KERNEL -> $LAST_KERNEL" | tee -a $tmpfile
+ needreboot=1
+fi
+
+echo "" | tee -a $tmpfile
+echo "Check if reboot required from other updates: " | tee -a $tmpfile
+
+if [ -e /var/run/reboot-required.pkgs ]; then
+ echo "reboot required, these running services have been updated:" | tee -a $tmpfile
+ cat /var/run/reboot-required.pkgs | tee -a $tmpfile
+ needreboot=1
+else
+ echo "no reboot required, no changes to running services" | tee -a $tmpfile
+fi
+
+if [ $needreboot -eq 0 ]; then
+ strsubj="No Restart Required"
+else
+ strsubj="Restart Required"
+fi
+
+mail -s "[$server] ${strsubj}" -a "FROM:$sender" ${email} < ${tmpfile}
+
+rm -f ${tmpfile}
+

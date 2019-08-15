@@ -1,0 +1,4 @@
+---
+- name: add changelog entry
+  include: "handlers/write_changelog_{{ ansible_system }}.yml"
+

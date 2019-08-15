@@ -1,0 +1,9 @@
+---
+# This is used to update the fact cache.
+- name: Ping the server to gather facts. 
+  hosts: all
+  gather_facts: yes
+#  remote_user: sysadmin
+#  become: yes
+  roles:
+  - role: ping

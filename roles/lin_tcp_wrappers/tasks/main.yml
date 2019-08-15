@@ -1,0 +1,16 @@
+---
+
+- name: Copy blank template to hosts.allow and hosts.deny
+  template:
+    src: hosts.template
+    dest: "{{ item }}"
+    owner: root
+    group: root
+    mode: 0644
+    backup: yes
+  loop:
+    - /etc/hosts.deny
+    - /etc/hosts.allow
+
+  notify: add changelog entry
+

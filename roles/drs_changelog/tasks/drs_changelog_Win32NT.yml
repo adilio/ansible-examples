@@ -1,0 +1,27 @@
+---
+# windows - create drs folders and changelog
+- name: Create drs dir structure
+  win_file:
+    path: 'C:\DRS\{{ item }}'
+    state: directory
+  loop:
+    - 'Scripts'
+    - 'Logs'
+    - 'Software'
+
+- name: Copy drs changelog
+  win_template:
+    src: 'changelog.txt'
+    dest: 'C:\DRS\Logs\changelog.txt'
+    force: no
+
+- name: Remove existing changelog symlink, if present
+  win_file:
+    path: 'C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\changelog.txt'
+    state: absent
+
+- name: Create changelog shortcut in startup
+  win_shortcut:
+    src: 'C:\DRS\Logs\changelog.txt'
+    dest: 'C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\changelog.txt.lnk'
+  notify: add changelog entry

@@ -1,0 +1,68 @@
+---
+
+- name: upgrade all packages (RHEL)
+  yum:
+    name: '*'
+    state: latest
+    #disablerepo: pgdg94,epel
+    #security: yes
+    update_cache: yes
+  ignore_errors: True
+  register: yum_out
+- debug:
+    var: yum_out
+    verbosity: 2
+
+- name: Mail if updates fail
+  mail:
+    to: "{{ admin_email }}"
+    from: "noreply@{{ ansible_hostname }}"
+    subject: "[{{ ansible_hostname }}] - Updates Failed!"
+    body: "{{ yum_out.msg }}"
+  when: yum_out | failed
+
+- name: Mail if updates applied
+  mail:
+    to: "{{ admin_email }}"
+    from: "noreply@{{ ansible_hostname }}"
+    subject: "[{{ ansible_hostname }}] - Updates Applied"
+    body: "{{ yum_out.results[0] }}"
+  when: yum_out.results[0] | search("Complete!")
+
+- name: Mail if no updates
+  mail:
+    to: "{{ admin_email }}"
+    from: "noreply@{{ ansible_hostname }}"
+    subject: "[{{ ansible_hostname }}] - Up to Date"
+    body: "{{ yum_out.results[0] }}"
+  when: yum_out.results[0] | search("Nothing to do")
+
+- name: reboot required?
+  command: needs-restarting -r
+  register: needs_restart
+  failed_when: needs_restart.rc != 1 and needs_restart.rc != 0
+  tags: 
+    - reboot # TODO this doesn't seem to actually run.
+  when: ansible_distribution_major_version == '7'
+
+- debug:
+    var: needs_restart
+    verbosity: 2
+
+- name: mail restart required?
+  mail:
+    to: "{{ admin_email }}"
+    from: "noreply@{{ ansible_hostname }}"
+    subject: "[{{ ansible_hostname }}] - Restart Required"
+    body: "{{ needs_restart.stdout }}"
+  when:
+    - needs_restart.rc == 1 # will cause failure if run with redhat 6 
+    - yum_out | success
+    - ansible_distribution_major_version == '7'
+
+#uncomment to have reboots
+#- name: reboot if required
+  #command: /sbin/shutdown -r
+  #when:
+    #- needs_restart.rc == 1
+

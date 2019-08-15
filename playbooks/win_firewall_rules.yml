@@ -1,0 +1,13 @@
+---
+- name: set initial firewall rules
+#  hosts: ANS
+  hosts:
+#  - server1.example.com
+  gather_facts: yes
+
+  vars:
+    cl_message: "Set initial firewall rules via Ansible"
+
+  roles:
+  - role: win_firewall_rules
+

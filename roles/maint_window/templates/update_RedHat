@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# {{ ansible_managed }}
+# Source: {{ template_fullpath }}
+# Host: {{ template_host }}
+# Tested on: RHEL 6.9, 7.4 | CentOS 6.9
+
+now=$(date +%Y%m%d%H%M)
+server=$(hostname)
+server=${server%%.*}
+updatelog=/opt/drs/log/update_${now}.log
+sender=no-reply@ubc.ca
+email={{ bis_systems_email }}
+
+# purge updatelog files older than a year
+find /opt/drs/log -name 'update_[0-9]*.log' ! -newermt '-365 days' | xargs -r rm
+
+echo "yum update on $server" | tee -a $updatelog
+echo "" | tee -a $updatelog
+/usr/bin/yum -y -e 0 update | tee -a $updatelog
+
+if grep -qi "No Packages marked for Update" $updatelog ; then
+ strsubj="No Updates to Install"
+else
+ strsubj="Updates Completed"
+fi
+
+# need to figure out a better way to detect yum errors
+if grep -qi 'error|fail' ${updatelog} ; then
+ strerr=", errors detected"
+else
+ strerr=""
+fi
+
+# add sender address
+sed -i "1s/^/Subject: [$server] ${strsubj}${strerr}\n/" $updatelog
+
+/usr/sbin/sendmail -r $sender $email < $updatelog
+# mail command attaches a .bin file
+#mail -s "Yum update log for [$server]" ${email} < $updatelog
+

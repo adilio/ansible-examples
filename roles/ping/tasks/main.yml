@@ -1,0 +1,4 @@
+---
+- name: Ping the server
+  include: "ping_{{ ansible_system }}.yml"
+

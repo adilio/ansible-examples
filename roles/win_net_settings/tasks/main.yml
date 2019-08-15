@@ -1,0 +1,53 @@
+---
+# Set initial DNS and Network settings for Winodws Pre-flight
+- name: Add or update regkey to disable IPv6 (2008 R2)
+  win_regedit:
+    path: HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters
+    name: DisabledComponents
+    data: 0xFF
+    type: dword
+  when: "'2008' in ansible_os_name"
+- name: Disable IPv6 and Link-Layer components via Get-NetAdapter (2012 R2+)
+  win_shell: |
+    Get-NetAdapter | ForEach-Object {Disable-NetAdapterBinding -InterfaceAlias $_.Name -ComponentID ms_tcpip6
+    Disable-NetAdapterBinding -InterfaceAlias $_.Name -ComponentID ms_lltdio
+    Disable-NetAdapterBinding -InterfaceAlias $_.Name -ComponentID ms_lldp
+    Disable-NetAdapterBinding -InterfaceAlias $_.Name -ComponentID ms_rspndr}
+    Add-Content -Value "[$(Get-Date -Format 'dd-MMM-yyyy HH:mm')]
+    IPv6 disabled on net adapter via Ansible
+    Existence of this logfile will skip subsequent runs of ths role.
+    If you'd like to re-apply the role, delete this file." -Path "C:\DRS\Logs\Disable-IPv6.txt"
+  args:
+    creates: 'C:\DRS\Logs\Disable-IPv6.txt'
+  when: ('2012' in ansible_os_name) or ('2016' in ansible_os_name)
+- name: Set DNS order
+  win_dns_client:
+    adapter_names: "*"
+    ipv4_addresses:
+    - 137.82.1.2
+    - 142.103.1.42
+    - 10.7.8.208
+    - 10.7.8.209
+    - 10.7.8.212
+    - 10.7.8.211
+    - 10.7.8.210
+    - 10.80.234.2
+    - 10.80.234.3
+    - 10.7.8.207
+- name: Set default DNS suffix and suffix search order
+  win_shell: |
+    $NetAdapter = Get-WmiObject Win32_NetworkAdapterConfiguration -filter "IPEnabled=TRUE"
+    $NetAdapter.SetDnsDomain("ead.ubc.ca")
+    $NetAdapter.SetDynamicDNSRegistration($true,$true)
+    $DNSSuffixes = @('ead.ubc.ca','bis.it.ubc.ca','ubc.ca')
+    $NetWMIBinding = [wmiclass]"Win32_NetworkAdapterConfiguration"
+    $NetWMIBinding.SetDNSSuffixSearchOrder($DNSSuffixes)
+    ipconfig /registerdns
+    Add-Content -Value "[$(Get-Date -Format 'dd-MMM-yyyy HH:mm')]
+    Default DNS suffix and suffix search order set on net adapter via Ansible.
+    Existence of this logfile will skip subsequent runs of ths role.
+    If you'd like to re-apply the role, delete this file." -Path "C:\DRS\Logs\Default-DNS-Suffix.txt"
+  args:
+    creates: 'C:\DRS\Logs\Default-DNS-Suffix.txt'
+  notify: add changelog entry
+

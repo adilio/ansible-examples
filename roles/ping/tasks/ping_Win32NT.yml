@@ -1,0 +1,4 @@
+---
+- name: Ping Windows
+  win_ping:
+

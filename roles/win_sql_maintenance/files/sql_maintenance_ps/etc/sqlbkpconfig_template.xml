@@ -1,0 +1,52 @@
+<!--#####################################################################################
+#
+# Version 1.05
+#
+# Written on 12/06/2012
+# By Michael Pal
+# 
+#####################################################################################-->
+
+
+<config>
+	<sqlserver>
+		<instance>
+			<name></name>
+		</instance>
+		<databases>
+			<name>master</name>
+			<name>model</name>
+			<name>msdb</name>
+			<name></name>
+			<name></name>
+		</databases>
+		<options>
+			<cleanupFiles>
+				<enabled>0</enabled>
+				<sourcefolder></sourcefolder>
+				<fileagedays>0</fileagedays>
+			</cleanupFiles>
+			<checkIntegrity>
+				<enabled>0</enabled>
+			</checkIntegrity>
+			<indexDefrag>
+				<enabled>0</enabled>
+			</indexDefrag>
+			<updateStatistics>
+				<enabled>0</enabled>
+			</updateStatistics>
+			<backupDatabase>
+				<enabled>0</enabled>
+				<location></location>
+			</backupDatabase>
+			<movefiles>
+				<enabled>0</enabled>
+				<sourcefolder></sourcefolder>
+				<targetfolder></targetfolder>
+			</movefiles>
+			<compression>
+				<enabled>0</enabled>
+			</compression>
+		</options>
+	</sqlserver>
+</config>

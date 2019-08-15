@@ -1,0 +1,58 @@
+---
+# Common tasks to run on Linux systems, typically during pre-flight
+
+- name: Adds /opt/drs/bin to sudo PATH
+  lineinfile:
+    dest: /etc/sudoers
+    backrefs: yes
+    state: present
+    backup: yes
+    regexp: '(^Default.*secure_path.*=")((?!.*?{{drs_bin}}).*?)(["]*)$'
+    line: '\1\2:{{drs_bin}}\3'
+    validate: 'visudo -cf %s'
+  notify: add changelog entry
+
+
+
+
+- name: Root mail alias
+  lineinfile:
+    dest: /etc/aliases
+    backrefs: yes
+    state: present
+    backup: yes
+    regexp: '^(.*)root:(.*)'
+    line: 'root:  ubcit.bislog@ubc.ca'
+
+- name: Ensure hostname is lowercase
+  hostname:
+    name: "{{ ansible_hostname | lower }}"
+
+
+- name: Add the correct FQDN to config files
+  replace:
+    path: '{{ item }}'
+    regexp: '^{{ ansible_default_ipv4.address }}.*$'
+    replace: '{{ ansible_default_ipv4.address }}  {{ ansible_hostname | lower }}.{{ fqdn_suffix }} {{ ansible_hostname | lower }}'
+    backup: yes
+  loop:
+    - /etc/hosts
+    #- /etc/postfix/main.cf
+  notify: add changelog entry
+
+- name: Postfix relay config
+  lineinfile:
+    path: /etc/postfix/main.cf
+    state: present
+    regexp: '^relayhost =.*$'
+    line: 'relayhost = [smtp.mail-relay.ubc.ca]'
+    backup: yes
+  notify:
+    - restart postfix
+
+- include_tasks: 'preflight_{{ ansible_distribution }}.yml'
+  notify: add changelog entry
+
+- name: Test Outgoing email
+  shell: 'echo "Hostnames match? [`hostname`]-[{{ ansible_hostname }}]" | mail -s "Email test from [`hostname`]" michael.macisaac@ubc.ca'
+

@@ -1,0 +1,16 @@
+---
+- name: create windows sql_maintenance scheduled task
+#  hosts: CLOCK:WFIOC:FMGT:ARPRX:&Windows
+  hosts:
+#  - server1.example.com
+#  gather_facts: yes
+
+  gather_facts: yes
+
+  vars:
+    cl_message: "{{ 'Enabled' if sm_enable else 'Disabled' }} Ansible role win_sql_maintenance --DL"
+    # override during testing
+    #sm_st_email: 'thisguy@example.com'
+
+  roles:
+  - role: win_sql_maintenance

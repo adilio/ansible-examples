@@ -1,0 +1,15 @@
+---
+- name: reboot servers
+  hosts: ANS
+  gather_facts: yes
+  roles:
+  - role: reboot
+  post_tasks:
+    - name: 'reboot test linux'
+      shell: echo 'reboot this machine'
+      when: ansible_system == 'Linux'
+      notify: 'reboot server'
+    - name: 'reboot test win32'
+      win_shell: echo 'reboot this win machine'
+      when: ansible_system == 'Win32NT'
+      notify: 'reboot server'

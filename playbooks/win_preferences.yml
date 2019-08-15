@@ -1,0 +1,13 @@
+---
+- name: Set initial misc. regkeys and prefs. for Winodws Pre-flight
+  hosts:
+#  - server1.example.com
+#  gather_facts: yes
+  gather_facts: yes
+
+  vars:
+    cl_message: "Set initial misc. regkeys and prefs. via Ansible"
+
+  roles:
+  - role: win_preferences
+

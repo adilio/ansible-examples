@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# {{ ansible_managed }}
+# Source: {{ template_fullpath }}
+# Host: {{ template_host }}
+# Tested on: RHEL 6.9, 7.4
+
+server=$(hostname)
+server=${server%%.*}
+tmpfile=$(mktemp)
+sender=no-reply@ubc.ca
+email={{ bis_systems_email }}
+
+rv=$(rpm -q redhat-release-server --qf '%{VERSION}'); rv=${rv%%.*}; rv=${rv/[^0-9]*/}
+if [ $rv -gt 6 ]; then
+ nrr="-r"
+ nrs="-s"
+else
+ nrr=""
+ nrs=""
+fi
+
+needreboot=0
+
+echo "Check if reboot of [$server] required from kernel update: " | tee -a $tmpfile
+
+# from check-new-kernel script
+LAST_KERNEL=$(rpm -q --last kernel | perl -pe 's/^kernel-(\S+).*/$1/' | head -1)
+CURRENT_KERNEL=$(uname -r)
+
+if [ $LAST_KERNEL = $CURRENT_KERNEL ]; then
+ echo "no reboot required, no change to kernel" | tee -a $tmpfile
+ echo "$CURRENT_KERNEL" | tee -a $tmpfile
+else
+ echo "reboot required, kernel change" | tee -a $tmpfile
+ echo "$CURRENT_KERNEL -> $LAST_KERNEL" | tee -a $tmpfile
+ needreboot=1
+fi
+
+echo "" | tee -a $tmpfile
+echo "Check if reboot required from other updates: " | tee -a $tmpfile
+
+# RHEL7 needs-restarting -r
+if [ -n "$(needs-restarting $nrr)" ]; then
+ echo "reboot required, these running services have been updated:" | tee -a $tmpfile
+ needs-restarting $nrs| tee -a $tmpfile
+ needreboot=1
+else
+ echo "no reboot required, no changes to running services" | tee -a $tmpfile
+fi
+
+if [ $needreboot -eq 0 ]; then
+ strsubj="No Restart Required"
+else
+ strsubj="Restart Required"
+fi
+
+sed -i "1s/^/Subject: [$server] ${strsubj}\n/" $tmpfile
+/usr/sbin/sendmail -r $sender $email < $tmpfile
+
+rm -f $tmpfile
+

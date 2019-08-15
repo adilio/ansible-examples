@@ -1,0 +1,58 @@
+---
+- include_tasks: 'maint_window_{{ ansible_system }}_{{ ansible_os_family }}.yml'
+
+- name: Add templated scripts and cron to enable maint_window role
+  template:
+    src: '{{ item.src }}'
+    dest: '{{ item.dest }}'
+    mode: '{{ item.mode }}'
+    owner: root
+  loop:
+    - { src: '0cron-update-notify_{{ ansible_os_family }}', dest: '/etc/cron.d/0cron-update-notify', mode: '0644' }
+    - { src: 'upgrade-notify', dest: '/opt/drs/bin/upgrade-notify', mode: '0774' }
+    - { src: 'notify-restart_{{ ansible_distribution }}', dest: '/opt/drs/bin/notify-restart', mode: '0774' }
+    - { src: 'update_{{ ansible_os_family }}', dest: '/opt/drs/bin/update-{{ ansible_distribution|lower }}', mode: '0774' }
+    - { src: 'run-if-today', dest: '/opt/drs/bin/run-if-today', mode: '0774' }
+  when: mw_enable == 'True'
+  notify: add changelog entry
+
+- name: Remove templated scripts and cron to disable maint_window role
+  file:
+    path: '{{ item }}'
+    state: absent
+  loop:
+    - '/etc/cron.d/0cron-update-notify'
+    - '/opt/drs/bin/upgrade-notify'
+    - '/opt/drs/bin/notify-restart'
+    - '/opt/drs/bin/update-{{ ansible_distribution|lower }}'
+  when: mw_enable == 'False'
+  notify: add changelog entry
+
+#    - { src: 'check-new-kernel', dest: '/opt/drs/bin/check-new-kernel', mode: '0774' }
+
+# previous files to delete
+#- { src: 'yum-update', dest: '/opt/drs/bin/yum-update', mode: '0774' }
+#- { src: 'upgrade-ubuntu', dest: '/opt/drs/bin/upgrade-ubuntu', mode: '0774' }
+- name: Cleanup file artifacts
+  file:
+    path: '{{ item }}'
+    state: absent
+  loop:
+    - '/opt/drs/bin/yum-update'
+    - '/opt/drs/bin/upgrade-ubuntu'
+    - '/opt/drs/bin/update-RedHat'
+    - '/opt/drs/bin/check-new-kernel'
+    - '/usr/local/bin/yumupdate.sh'
+    - '/etc/cron.d/apt_update'
+    - '/etc/cron.d/notify_restart'
+    - '/root/drs/bin/run-if-today'
+    - '/root/drs/bin/notify_restart.sh'
+  notify: add changelog entry
+
+- name: Cleanup file content artifacts
+  lineinfile:
+    path: '/var/spool/cron/root'
+    state: absent
+    regexp: '^.*yumupdate.sh$'
+  notify: add changelog entry
+

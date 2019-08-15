@@ -1,0 +1,20 @@
+---
+# linux - create drs folders and changelog
+- name: Creates opt dir structure
+  file:
+    path: /opt/drs/{{ item }}
+    state: directory
+    mode: 0775
+  loop:
+    - log
+    - bin
+    - src
+
+- name: Create changelog file
+  file:
+    path: /opt/drs/log/changelog.txt
+    state: touch
+    mode: 0664
+    modification_time: preserve
+    access_time: preserve
+  notify: add changelog entry

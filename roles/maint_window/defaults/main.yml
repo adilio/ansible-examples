@@ -1,0 +1,6 @@
+---
+# maint_window role default variables
+# for months_of_year argument for win_scheduled_task module
+mw_months: ['January','February','March','April','May','June','July','August','September','October','November','December']
+# for converting cron-style monthly freq
+mw_mwf: "{{ mw_month_freq|replace('/','')|replace('*','1')|int }}"

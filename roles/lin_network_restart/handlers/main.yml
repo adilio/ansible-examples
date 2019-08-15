@@ -1,0 +1,18 @@
+---
+
+# There is an issue with Ubunutu 14 and the networking service whereby 
+# using 'service networking restart' will not restart networking. As
+# a result, the ifdown and ifup commands are required to reliably 
+# restart the service and this has been used for all Ubuntu versions.
+
+- name: restart rhel network 
+  service:
+    name: network.service
+    state: restarted
+  when: ansible_distribution_file_variety == "RedHat"
+  listen: "restart network"
+
+- name: restart ubuntu network
+  shell: "ifdown --exclude=lo -a && ifup --exclude=lo -a"
+  when: ansible_distribution == "Ubuntu"
+  listen: "restart network"
